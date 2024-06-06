@@ -1,5 +1,12 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jun  6 11:00:26 2024
+
+@author: msole
+"""
 from gurobipy import Model, GRB, quicksum
 import numpy as np
+
 
 def solve_lp(c, A, b, bounds):
     model = Model()
@@ -13,21 +20,31 @@ def solve_lp(c, A, b, bounds):
         return [v.X for v in model.getVars()], model.objVal
     else:
         return None, None
-
+node_counter = 0  # Global counter to label nodes uniquely
+    
 def branch_and_bound(c, A, b, bounds):
     best_solution = [None, float('inf')]  # Initialize best_solution
 
     def recurse(bounds, depth):
+        global node_counter
+        node_id = node_counter
+        node_counter += 1  # Increment node counter to assign a unique ID to this node
+
         solution, z = solve_lp(c, A, b, bounds)
         if solution is None:
-            print(f"{'  '*depth}Node: Infeasible")
+            print(f"{'  '*depth}Node {node_id}: Infeasible")
             return best_solution
 
-        print(f"{'  '*depth}Node: Solution to Relaxation: x={np.round(solution, 6)}, z={z:.1f}")
+        # Pruning based on the bounding
+        if z >= best_solution[1]:
+            print(f"{'  '*depth}Node {node_id}: Pruned (z = {z:.1f} >= best z = {best_solution[1]:.1f})")
+            return best_solution
+
+        print(f"{'  '*depth}Node {node_id}: Solution to Relaxation: x={np.round(solution, 6)}, z={z:.1f}")
 
         if all(np.isclose(solution, np.round(solution))):
-            if best_solution[0] is None or z < best_solution[1]:
-                print(f"{'  '*depth}--> New best integer solution found with z={z:.1f}")
+            if z < best_solution[1]:
+                print(f"{'  '*depth}Node {node_id}: --> New best integer solution found with z={z:.1f}")
                 best_solution[0], best_solution[1] = solution, z
             return best_solution
         
@@ -35,19 +52,18 @@ def branch_and_bound(c, A, b, bounds):
             if not np.isclose(val, np.round(val)):
                 down_bounds = bounds[:]
                 down_bounds[i] = (bounds[i][0], np.floor(val))
-                print(f"{'  '*depth}Branching on x[{i}] <= {np.floor(val)}")
+                print(f"{'  '*depth}Node {node_id}: Branching on x[{i}] <= {np.floor(val)}")
                 recurse(down_bounds, depth + 1)
 
                 up_bounds = bounds[:]
                 up_bounds[i] = (np.ceil(val), bounds[i][1])
-                print(f"{'  '*depth}Branching on x[{i}] >= {np.ceil(val)}")
+                print(f"{'  '*depth}Node {node_id}: Branching on x[{i}] >= {np.ceil(val)}")
                 recurse(up_bounds, depth + 1)
                 break  # Only branch on the first non-integer solution found
 
         return best_solution
 
     return recurse(bounds, 0)
-
 # Define problem constants
 c = [-6, -5]  # Coefficients of the objective function
 A = [[3, 1], [-1, 2]]  # Coefficients matrix for inequalities
