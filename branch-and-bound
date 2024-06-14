@@ -60,3 +60,4 @@ if best_solution[0]:
     print(f"\nOptimal solution: {best_solution[0]} with objective value: {best_solution[1]:.1f}")
 else:
     print("\nNo feasible integer solution found.")
+# Created by AI
